@@ -24,13 +24,28 @@ def search_songs(query):
         return {"error": "No songs found"}
 
     for song in results[:10]:  # Get up to 10 results
-        song_link = song.find("h5").find("a")
-        if song_link:
-            title = song_link.text.strip()
-            song_url = urljoin(BASE_URL, song_link['href'])
-            song_list.append({"title": title, "url": song_url})
+        title_tag = song.find("h5")
+        if not title_tag:
+            continue  # Skip if <h5> is missing
 
-    return {"songs": song_list}
+        song_link = title_tag.find("a")
+        if not song_link:
+            continue  # Skip if <a> is missing
+
+        title = song_link.text.strip()
+        song_url = urljoin(BASE_URL, song_link['href'])
+
+        # Extract lyrics preview
+        lyrics_preview_tag = song.find("em")
+        lyrics_preview = lyrics_preview_tag.get_text(strip=True) if lyrics_preview_tag else "No preview available"
+
+        song_list.append({
+            "title": title,
+            "url": song_url,
+            "lyrics_preview": lyrics_preview
+        })
+
+    return {"songs": song_list} if song_list else {"error": "No valid songs found"}
 
 def get_song_details(song_url):
     """Fetch the title, artist, and lyrics from a song URL."""
@@ -41,14 +56,29 @@ def get_song_details(song_url):
     soup = BeautifulSoup(response.text, "html.parser")
 
     try:
-        title_info = soup.find("div", class_="ibar mt-2").get_text(strip=True, separator='|').split('|')
-        title = title_info[0] if len(title_info) > 0 else "Unknown Title"
-        artist = title_info[4] if len(title_info) > 4 else "Unknown Artist"
-        
-        lyric = soup.find("div", id="lyric").text.strip()
-        clean_lyric = re.sub(r'\[[A-G][#b]?[mM]?[0-9]?\]', '', lyric)
+        # Extract title and artist
+        title_info = soup.find("div", class_="ibar mt-2")
+        if not title_info:
+            return {"error": "Song metadata not found"}
 
-        return {"title": title, "artist": artist, "lyrics": clean_lyric, "url": song_url}
+        title_parts = title_info.get_text(strip=True, separator='|').split('|')
+        title = title_parts[0] if len(title_parts) > 0 else "Unknown Title"
+        artist = title_parts[4] if len(title_parts) > 4 else "Unknown Artist"
+
+        # Extract lyrics
+        lyric_section = soup.find("div", id="lyric")
+        if not lyric_section:
+            return {"error": "Lyrics not found"}
+
+        raw_lyric = lyric_section.get_text(strip=True)
+        clean_lyric = re.sub(r'\[[A-G][#b]?[mM]?[0-9]?\]', '', raw_lyric)  # Remove chord notations
+
+        return {
+            "title": title,
+            "artist": artist,
+            "lyrics": clean_lyric,
+            "url": song_url
+        }
 
     except AttributeError:
         return {"error": "Error extracting song details"}
