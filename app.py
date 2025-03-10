@@ -70,7 +70,7 @@ def get_song_details(song_url):
         if not lyric_section:
             return {"error": "Lyrics not found"}
 
-        raw_lyric = lyric_section.get_text(strip=True)
+        raw_lyric = lyric_section.text.strip()
         clean_lyric = re.sub(r'\[[A-G][#b]?[mM]?[0-9]?\]', '', raw_lyric)  # Remove chord notations
 
         return {
